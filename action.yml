@@ -1,0 +1,45 @@
+name: 'Deploy Soroban Contract'
+description: 'Builds and deploys a Soroban smart contract to the Stellar network'
+inputs:
+  network:
+    description: 'Target network (testnet, futurenet, mainnet)'
+    required: true
+    default: 'testnet'
+  source-secret-key:
+    description: 'Secret key of the deploying account'
+    required: true
+  manifest-path:
+    description: 'Path to the Cargo.toml of the contract'
+    required: false
+    default: 'Cargo.toml'
+runs:
+  using: "composite"
+  steps:
+    - name: Install Rust Wasm Target
+      run: rustup target add wasm32-unknown-unknown
+      shell: bash
+
+    - name: Install Soroban CLI
+      run: cargo install --locked soroban-cli
+      shell: bash
+
+    - name: Build Contract
+      run: soroban contract build --manifest-path ${{ inputs.manifest-path }}
+      shell: bash
+
+    - name: Deploy Contract
+      run: |
+        # Find the compiled .wasm file
+        WASM_FILE=$(find target/wasm32-unknown-unknown/release -name "*.wasm" | head -n 1)
+        
+        if [ -z "$WASM_FILE" ]; then
+          echo "Error: Could not find compiled .wasm file."
+          exit 1
+        fi
+        
+        echo "Deploying $WASM_FILE to ${{ inputs.network }}..."
+        soroban contract deploy \
+          --wasm $WASM_FILE \
+          --source ${{ inputs.source-secret-key }} \
+          --network ${{ inputs.network }}
+      shell: bash
